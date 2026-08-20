@@ -16,6 +16,7 @@ windows outside the visible scrolling viewport.
 - Marks the focused window with a rounded, theme-aware raised surface.
 - Left-clicks focus windows, middle-clicks close them, and tooltips show titles.
 - Resolves icons for native apps, Electron apps, and Chromium web apps.
+- Adapts to top, bottom, left, and right bars, including scaled displays.
 
 ## Install
 
@@ -46,6 +47,11 @@ background decoration; only the focused window receives a selection surface.
 There are no extra packages, daemons, polling scripts, or network calls. Window
 state comes from Quickshell's Hyprland integration. Executable lookup reads only
 `/proc/<pid>/exe` to improve desktop-entry matching.
+
+The widget has no application-specific class list or monitor coordinates. It
+uses each system's Freedesktop desktop entries, focused Hyprland workspace, and
+live compositor geometry, so it works with custom themes, multiple monitors,
+standard Hyprland layouts, and scrolling layouts.
 
 ## Remove
 

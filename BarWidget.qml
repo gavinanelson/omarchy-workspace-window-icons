@@ -1,11 +1,13 @@
 import QtQuick
 import QtQuick.Effects
+import QtQuick.Layouts
 import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Io
 import qs.Commons
 import qs.Ui
 import "AppIconModel.js" as AppIconModel
+import "WorkspaceModel.js" as WorkspaceModel
 
 BarWidget {
   id: root
@@ -18,7 +20,8 @@ BarWidget {
   readonly property var desktopEntries: DesktopEntries.applications
     ? DesktopEntries.applications.values : []
   readonly property int configuredIconSize: Math.max(12, Number(setting("iconSize", 18)))
-  readonly property int iconSize: Math.min(configuredIconSize, Math.max(12, barSize - Style.space(8)))
+  readonly property int iconSize: Math.max(8,
+    Math.min(configuredIconSize, barSize - Style.space(8)))
   readonly property int itemGap: Math.max(0, Number(setting("itemGap", 3)))
   readonly property real inactiveOpacity: Math.max(0.2,
     Math.min(1, Number(setting("inactiveOpacity", 100)) / 100))
@@ -36,34 +39,20 @@ BarWidget {
     var workspace = Hyprland.focusedWorkspace
     if (!workspace || !workspace.toplevels) return []
 
-    var result = []
-    var values = workspace.toplevels.values
-    for (var i = 0; i < values.length; i++) result.push(values[i])
-    result.sort(function(left, right) {
-      var leftIpc = left && left.lastIpcObject ? left.lastIpcObject : ({})
-      var rightIpc = right && right.lastIpcObject ? right.lastIpcObject : ({})
-      var leftFloating = leftIpc.floating === true ? 1 : 0
-      var rightFloating = rightIpc.floating === true ? 1 : 0
-      if (leftFloating !== rightFloating) return leftFloating - rightFloating
-
-      var leftAt = leftIpc.at || [999999, 999999]
-      var rightAt = rightIpc.at || [999999, 999999]
-      var leftX = Number(leftAt[0] === undefined ? 999999 : leftAt[0])
-      var rightX = Number(rightAt[0] === undefined ? 999999 : rightAt[0])
-      if (leftX !== rightX) return leftX - rightX
-      var leftY = Number(leftAt[1] === undefined ? 999999 : leftAt[1])
-      var rightY = Number(rightAt[1] === undefined ? 999999 : rightAt[1])
-      if (leftY !== rightY) return leftY - rightY
-      return String(left.address || "").localeCompare(String(right.address || ""))
-    })
-    return result
+    return WorkspaceModel.sortedWindows(workspace.toplevels.values)
   }
 
-  visible: !vertical && workspaceWindows.length > 0
-  implicitWidth: visible ? windowRow.implicitWidth + Style.space(4) : 0
-  implicitHeight: barSize
+  visible: workspaceWindows.length > 0
+  implicitWidth: visible
+    ? (vertical ? barSize : windowGrid.implicitWidth + Style.space(4)) : 0
+  implicitHeight: visible
+    ? (vertical ? windowGrid.implicitHeight + Style.space(4) : barSize) : 0
 
   Behavior on implicitWidth {
+    NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+  }
+
+  Behavior on implicitHeight {
     NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
   }
 
@@ -89,7 +78,10 @@ BarWidget {
   function closeWindow(toplevel) {
     if (!toplevel) return
     if (toplevel.wayland) toplevel.wayland.close()
-    else Hyprland.dispatch("closewindow address:" + String(toplevel.address || ""))
+    else {
+      var ipc = toplevel.lastIpcObject || ({})
+      Hyprland.dispatch("closewindow address:" + String(ipc.address || toplevel.address || ""))
+    }
   }
 
   function close() { settingsOpen = false }
@@ -118,10 +110,12 @@ BarWidget {
     }
   }
 
-  Row {
-    id: windowRow
+  GridLayout {
+    id: windowGrid
     anchors.centerIn: parent
-    spacing: root.itemGap
+    columns: root.vertical ? 1 : Math.max(1, root.workspaceWindows.length)
+    columnSpacing: root.vertical ? 0 : root.itemGap
+    rowSpacing: root.vertical ? root.itemGap : 0
 
     Repeater {
       // Repeat by slot and resolve the toplevel through the freshly sorted
@@ -161,8 +155,8 @@ BarWidget {
           ? String(desktopEntry.icon || "") : ""
         readonly property string iconSource: root.resolveIconSource(iconName)
 
-        width: root.iconSize + Style.space(6)
-        height: root.barSize
+        Layout.preferredWidth: root.vertical ? root.barSize : root.iconSize + Style.space(6)
+        Layout.preferredHeight: root.vertical ? root.iconSize + Style.space(6) : root.barSize
 
         function refreshExecutable() {
           executablePath = ""
@@ -186,7 +180,7 @@ BarWidget {
           id: focusSurface
           anchors.centerIn: parent
           width: root.iconSize + Style.space(8)
-          height: Math.min(windowButton.height - Style.space(2), root.iconSize + Style.space(8))
+          height: root.iconSize + Style.space(8)
           radius: Math.max(Style.space(7), Style.cornerRadius)
           color: Util.alpha(root.foreground, 0.24)
           border.width: Style.space(1)
