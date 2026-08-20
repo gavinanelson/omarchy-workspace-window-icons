@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "id": "gavinanelson.workspace-window-icons",
+  "name": "Workspace Window Icons",
+  "version": "1.0.0",
+  "author": "Gavin Nelson",
+  "license": "MIT",
+  "description": "A task strip for Hyprland scrolling layouts that shows every window in the focused workspace, including off-screen columns, in spatial order.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Workspace window icons",
+    "description": "Window icons in scrolling-layout order, including windows outside the visible viewport.",
+    "category": "Compositor",
+    "allowMultiple": false,
+    "defaultSection": "left",
+    "defaults": {
+      "iconSaturation": 100,
+      "iconSize": 18,
+      "inactiveOpacity": 100,
+      "itemGap": 3
+    },
+    "schema": [
+      {
+        "key": "iconSaturation",
+        "type": "integer",
+        "label": "Icon saturation (%)",
+        "description": "0 is grayscale, 100 is the original icon, and 200 is fully boosted.",
+        "min": 0,
+        "max": 200,
+        "step": 5,
+        "defaultValue": 100
+      },
+      {
+        "key": "iconSize",
+        "type": "integer",
+        "label": "Icon size",
+        "description": "Application-icon size in logical pixels.",
+        "min": 12,
+        "max": 24,
+        "step": 1,
+        "defaultValue": 18
+      },
+      {
+        "key": "inactiveOpacity",
+        "type": "integer",
+        "label": "Inactive icon opacity (%)",
+        "description": "Opacity of open windows that are not focused.",
+        "min": 20,
+        "max": 100,
+        "step": 5,
+        "defaultValue": 100
+      },
+      {
+        "key": "itemGap",
+        "type": "integer",
+        "label": "Icon spacing",
+        "description": "Space between window icons in logical pixels.",
+        "min": 0,
+        "max": 12,
+        "step": 1,
+        "defaultValue": 3
+      }
+    ]
+  }
+}
