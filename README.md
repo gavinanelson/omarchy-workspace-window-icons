@@ -20,16 +20,10 @@ windows outside the visible scrolling viewport.
 ## Install
 
 ```bash
-omarchy plugin add https://github.com/gavinanelson/omarchy-workspace-window-icons.git --enable --yes
-omarchy bar move gavinanelson.workspace-window-icons --section left --after omarchy.workspaces
+omarchy plugin add https://github.com/gavinanelson/omarchy-workspace-window-icons --enable
 ```
 
-If you use a custom workspace widget, move this plugin after that widget's ID
-instead:
-
-```bash
-omarchy bar move gavinanelson.workspace-window-icons --section left --after your.workspace-widget
-```
+That's it. Omarchy handles validation, enabling, and bar placement.
 
 ## Appearance settings
 
@@ -56,18 +50,18 @@ state comes from Quickshell's Hyprland integration. Executable lookup reads only
 ## Remove
 
 ```bash
-omarchy plugin remove gavinanelson.workspace-window-icons --yes
+omarchy plugin remove
 ```
+
+Choose **Workspace Window Icons** from the list.
 
 ## Development
 
-Install the repository at
-`~/.config/omarchy/plugins/gavinanelson.workspace-window-icons`, then run:
+From the repository root, run:
 
 ```bash
-omarchy plugin validate ~/.config/omarchy/plugins/gavinanelson.workspace-window-icons
+omarchy plugin validate .
 ./tests/test_plugin.sh
-omarchy restart shell
 ```
 
 ## Attribution
