@@ -15,6 +15,9 @@ BarWidget {
 
   property int eventSerial: 0
   property bool settingsOpen: false
+  property var compositorOrderAddresses: []
+  property int queriedWorkspaceId: 0
+  property bool windowOrderRefreshPending: false
   readonly property bool opened: settingsOpen
   readonly property color foreground: bar ? bar.barForeground : Color.foreground
   readonly property var desktopEntries: DesktopEntries.applications
@@ -47,7 +50,8 @@ BarWidget {
     var workspace = Hyprland.focusedWorkspace
     if (!workspace || !workspace.toplevels) return []
 
-    return WorkspaceModel.sortedWindows(workspace.toplevels.values)
+    return WorkspaceModel.sortedWindows(
+      workspace.toplevels.values, compositorOrderAddresses)
   }
 
   visible: workspaceWindows.length > 0
@@ -127,6 +131,21 @@ BarWidget {
       bar.shell.updateEntryInline(moduleName, settings)
   }
 
+  function refreshCompositorOrder() {
+    var workspace = Hyprland.focusedWorkspace
+    if (!workspace) return
+
+    if (windowOrderQuery.running) {
+      windowOrderRefreshPending = true
+      return
+    }
+
+    queriedWorkspaceId = Number(workspace.id || 0)
+    windowOrderRefreshPending = false
+    windowOrderQuery.command = ["hyprctl", "clients", "-j"]
+    windowOrderQuery.running = true
+  }
+
   Connections {
     target: Hyprland
     function onRawEvent(event) {
@@ -134,6 +153,47 @@ BarWidget {
       // compositor events, including scrolling-layout moves.
       Hyprland.refreshToplevels()
       root.eventSerial++
+      if (String(event && event.name || "") === "custom"
+          && String(event && event.data || "") === "workspace-window-icons-reordered")
+        Qt.callLater(root.refreshCompositorOrder)
+    }
+  }
+
+  // Hyprland does not emit a socket event for every in-layout reorder. Keep a
+  // small one-shot snapshot current so ordinary swap bindings update the strip
+  // even when they do not opt into the custom immediate-refresh event above.
+  Timer {
+    interval: 350
+    repeat: true
+    running: root.visible
+    onTriggered: root.refreshCompositorOrder()
+  }
+
+  Process {
+    id: windowOrderQuery
+
+    onExited: {
+      if (root.windowOrderRefreshPending)
+        Qt.callLater(root.refreshCompositorOrder)
+    }
+
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        try {
+          var workspace = Hyprland.focusedWorkspace
+          if (!workspace || Number(workspace.id || 0) !== root.queriedWorkspaceId)
+            return
+
+          var clients = JSON.parse(String(text || "[]"))
+          root.compositorOrderAddresses = WorkspaceModel.orderedAddresses(
+            clients, root.queriedWorkspaceId)
+          Hyprland.refreshToplevels()
+          root.eventSerial++
+        } catch (error) {
+          console.warn("Workspace window icon refresh failed:", error)
+        }
+      }
     }
   }
 

@@ -7,7 +7,7 @@ manifest="${plugin_root}/manifest.json"
 jq -e '
   .schemaVersion == 1
   and .id == "gavinanelson.workspace-window-icons"
-  and .version == "1.2.0"
+  and .version == "1.2.1"
   and (.kinds | index("bar-widget") != null)
   and .entryPoints.barWidget == "BarWidget.qml"
 ' "${manifest}" >/dev/null
@@ -169,10 +169,28 @@ if (JSON.stringify(addresses) !== JSON.stringify(expected)) {
 if (model.coordinate({ at: ["not-a-number", null] }, 0) !== 999999) {
   throw new Error("invalid coordinates must sort last")
 }
+
+const clients = [
+  { address: "ws2", workspace: { id: 2 }, at: [0, 0], floating: false },
+  { address: "right", workspace: { id: 1 }, at: [900, 0], floating: false },
+  { address: "left", workspace: { id: 1 }, at: [0, 0], floating: false }
+]
+const compositorOrder = model.orderedAddresses(clients, 1)
+if (JSON.stringify(compositorOrder) !== JSON.stringify(["left", "right"])) {
+  throw new Error(`unexpected compositor snapshot order: ${compositorOrder.join(", ")}`)
+}
+
+const staleToplevels = [window("left", 900, 0), window("right", 0, 0)]
+const refreshed = model.sortedWindows(staleToplevels, compositorOrder).map(model.addressOf)
+if (JSON.stringify(refreshed) !== JSON.stringify(["left", "right"])) {
+  throw new Error(`compositor snapshot must override stale QML geometry: ${refreshed.join(", ")}`)
+}
 NODE
 
 grep -Fq 'columns: root.vertical ? 1' "${plugin_root}/BarWidget.qml"
 grep -Fq 'Layout.preferredHeight: root.vertical' "${plugin_root}/BarWidget.qml"
+grep -Fq 'workspace-window-icons-reordered' "${plugin_root}/BarWidget.qml"
+grep -Fq 'interval: 350' "${plugin_root}/BarWidget.qml"
 
 if command -v omarchy >/dev/null 2>&1; then
   omarchy plugin validate "${plugin_root}"

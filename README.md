@@ -10,6 +10,8 @@ windows outside the visible scrolling viewport.
 
 - Shows only windows from the focused workspace.
 - Follows the compositor's left-to-right window geometry rather than focus history.
+- Updates icon order after in-layout window swaps, including swaps for which
+  Hyprland emits no window-move event.
 - Keeps off-screen scrolling-layout windows visible in the bar.
 - Places tiled windows first and floating windows afterward.
 - Uses clean, full-opacity application icons with no idle tiles or underlines.
@@ -50,11 +52,13 @@ background decoration; only the focused window receives a selection surface.
 - Hyprland.
 - Standard Freedesktop desktop entries for application icon matching.
 
-There are no extra packages, daemons, polling loops, or runtime network calls.
-Window state comes from Quickshell's Hyprland integration. One-shot process
-lookups read `/proc/<pid>/exe` and the Steam AppID environment variables to
-identify wrapped applications. Web-app icons come from the local desktop
-entries and icon files that Omarchy creates when installing a web app.
+There are no extra packages, daemons, or runtime network calls. Window state
+comes from Quickshell's Hyprland integration, with a lightweight local
+`hyprctl clients` snapshot keeping spatial order current when Hyprland omits a
+layout-reorder event. One-shot process lookups read `/proc/<pid>/exe` and the
+Steam AppID environment variables to identify wrapped applications. Web-app
+icons come from the local desktop entries and icon files that Omarchy creates
+when installing a web app.
 Quickshell plugin windows use the shell's live plugin registry; launcher icons
 remain authoritative when a matching desktop entry exists, with plugin-local
 icon assets as the fallback.

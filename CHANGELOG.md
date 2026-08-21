@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented here.
 
+## 1.2.1 - 2026-08-21
+
+- Keep window icons in sync after scrolling-layout swaps and other in-layout
+  reorders that Hyprland does not announce through its event socket.
+- Refresh ordering from compositor client coordinates instead of waiting for
+  Quickshell's cached toplevel geometry to catch up.
+- Preserve the active-window highlight while its icon moves to its new slot.
+- Accept an optional `workspace-window-icons-reordered` custom Hyprland event
+  for immediate refreshes while retaining automatic updates for standard binds.
+
 ## 1.2.0 - 2026-08-21
 
 - Use Omarchy-installed favicons for web-app windows instead of their browser icon.

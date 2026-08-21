@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "gavinanelson.workspace-window-icons",
   "name": "Workspace Window Icons",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "author": "Gavin Nelson",
   "license": "MIT",
   "description": "A task strip for Hyprland scrolling layouts that shows every window in the focused workspace, including off-screen columns, in spatial order.",
