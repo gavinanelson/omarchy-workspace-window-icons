@@ -33,13 +33,49 @@ function compareWindows(left, right) {
   return addressOf(left).localeCompare(addressOf(right))
 }
 
-function sortedWindows(values) {
+function orderedAddresses(clients, workspaceId) {
+  var matching = []
+  var source = clients || []
+  var wanted = Number(workspaceId)
+
+  for (var i = 0; i < source.length; i++) {
+    var client = source[i]
+    var clientWorkspace = client && client.workspace ? Number(client.workspace.id) : NaN
+    if (client && clientWorkspace === wanted)
+      matching.push({ lastIpcObject: client })
+  }
+
+  matching.sort(compareWindows)
+
+  var addresses = []
+  for (var j = 0; j < matching.length; j++)
+    addresses.push(addressOf(matching[j]))
+  return addresses
+}
+
+function sortedWindows(values, preferredAddresses) {
   var result = []
   var source = values || []
   for (var i = 0; i < source.length; i++) {
     if (source[i]) result.push(source[i])
   }
-  result.sort(compareWindows)
+
+  var ranks = ({})
+  var preferred = preferredAddresses || []
+  for (var j = 0; j < preferred.length; j++) ranks[String(preferred[j])] = j
+
+  result.sort(function(left, right) {
+    var leftAddress = addressOf(left)
+    var rightAddress = addressOf(right)
+    var leftRank = ranks[leftAddress]
+    var rightRank = ranks[rightAddress]
+    var leftKnown = leftRank !== undefined
+    var rightKnown = rightRank !== undefined
+
+    if (leftKnown && rightKnown && leftRank !== rightRank) return leftRank - rightRank
+    if (leftKnown !== rightKnown) return leftKnown ? -1 : 1
+    return compareWindows(left, right)
+  })
   return result
 }
 
@@ -49,6 +85,7 @@ if (typeof module !== "undefined") {
     coordinate: coordinate,
     addressOf: addressOf,
     compareWindows: compareWindows,
+    orderedAddresses: orderedAddresses,
     sortedWindows: sortedWindows
   }
 }
