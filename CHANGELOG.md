@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented here.
 
+## 1.2.0 - 2026-08-21
+
+- Use Omarchy-installed favicons for web-app windows instead of their browser icon.
+- Match Chromium-family `--app` windows by URL host and installed PWAs by app ID.
+- Give Quickshell plugin windows distinct icons despite their shared process and class.
+- Re-resolve identity metadata on compositor events so late title/class updates are reflected.
+- Reject stale process and icon lookup results when a delegate is reused for a
+  newly opened window.
+- Resolve Steam and Proton games by window AppID or process environment, with
+  Steam's local icon cache as a desktop-shortcut-independent fallback.
+- Match wrapped commands used by Flatpak, terminal launchers, AppImages, Wine,
+  and game launchers, with exact launcher-name matching as the final fallback.
+- Keep matching local and generic with no site-specific rules or runtime network calls.
+
 ## 1.1.0 - 2026-08-20
 
 - Support top, bottom, left, and right Omarchy bar orientations.

@@ -19,6 +19,14 @@ BarWidget {
   readonly property color foreground: bar ? bar.barForeground : Color.foreground
   readonly property var desktopEntries: DesktopEntries.applications
     ? DesktopEntries.applications.values : []
+  readonly property var pluginRegistry: bar && bar.shell
+    ? bar.shell.pluginRegistry : null
+  readonly property var pluginManifests: pluginRegistry
+    ? pluginRegistry.installedPlugins : ({})
+  readonly property int pluginRegistryRevision: pluginRegistry
+    ? Number(pluginRegistry.registryRevision || 0) : 0
+  readonly property string steamIconHelper: String(Qt.resolvedUrl("scripts/steam-icon.sh"))
+    .replace(/^file:\/\//, "")
   readonly property int configuredIconSize: Math.max(12, Number(setting("iconSize", 18)))
   readonly property int iconSize: Math.max(8,
     Math.min(configuredIconSize, barSize - Style.space(8)))
@@ -56,14 +64,33 @@ BarWidget {
     NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
   }
 
-  function resolveIconSource(icon) {
+  function availableIconSource(icon) {
     var value = String(icon || "")
-    if (bar && bar.shell && bar.shell.appLibrary) return bar.shell.appLibrary.iconSource(value)
-    if (!value) return Quickshell.iconPath("application-x-executable", true)
+    if (!value) return ""
     if (value.indexOf("file://") === 0 || value.indexOf("image://") === 0) return value
     if (value.charAt(0) === "/") return Util.fileUrl(value)
+    if (bar && bar.shell && bar.shell.appLibrary) {
+      var indexed = bar.shell.appLibrary.iconIndex[value]
+      if (indexed) return Util.fileUrl(indexed)
+    }
     return Quickshell.iconPath(value, true)
-      || Quickshell.iconPath("application-x-executable", true)
+  }
+
+  function pluginIconSources(manifest) {
+    var revision = pluginRegistryRevision
+    var values = AppIconModel.pluginIconValues(manifest)
+    var result = []
+    for (var i = 0; i < values.length; i++) {
+      var value = String(values[i] || "")
+      var source = value.charAt(0) === "/" ? Util.fileUrl(value) : availableIconSource(value)
+      if (source && result.indexOf(source) === -1) result.push(source)
+    }
+    return result
+  }
+
+  function appendUnique(target, values) {
+    for (var i = 0; i < values.length; i++)
+      if (values[i] && target.indexOf(values[i]) === -1) target.push(values[i])
   }
 
   function focusWindow(toplevel) {
@@ -130,13 +157,31 @@ BarWidget {
         readonly property var toplevel: root.workspaceWindows[index]
         readonly property var ipc: toplevel && toplevel.lastIpcObject
           ? toplevel.lastIpcObject : ({})
-        readonly property string appClass: String(ipc.class || "")
-        readonly property string initialClass: String(ipc.initialClass || "")
-        readonly property int pid: Number(ipc.pid || 0)
-        readonly property string title: String(
-          (toplevel ? toplevel.title : "") || ipc.title || appClass || "Application")
-        readonly property string windowAddress: String(ipc.address
-          || (toplevel ? toplevel.address : "") || "")
+        readonly property string appClass: {
+          var dependency = root.eventSerial
+          return String(ipc.class || "")
+        }
+        readonly property string initialClass: {
+          var dependency = root.eventSerial
+          return String(ipc.initialClass || "")
+        }
+        readonly property string initialTitle: {
+          var dependency = root.eventSerial
+          return String(ipc.initialTitle || "")
+        }
+        readonly property int pid: {
+          var dependency = root.eventSerial
+          return Number(ipc.pid || 0)
+        }
+        readonly property string title: {
+          var dependency = root.eventSerial
+          return String((toplevel ? toplevel.title : "")
+            || ipc.title || appClass || "Application")
+        }
+        readonly property string windowAddress: {
+          var dependency = root.eventSerial
+          return String(ipc.address || (toplevel ? toplevel.address : "") || "")
+        }
         readonly property var activeIpc: Hyprland.activeToplevel
           && Hyprland.activeToplevel.lastIpcObject
           ? Hyprland.activeToplevel.lastIpcObject : ({})
@@ -145,34 +190,138 @@ BarWidget {
         readonly property bool focused: !!toplevel && (activeAddress
           ? windowAddress === activeAddress : toplevel.activated)
         property string executablePath: ""
+        property string steamEnvironmentAppId: ""
+        property string steamCacheIconPath: ""
+        property int executableLookupPid: 0
+        property int steamEnvironmentLookupPid: 0
+        property string steamIconLookupAppId: ""
+        property bool executableRefreshPending: false
+        property bool steamEnvironmentRefreshPending: false
+        property bool steamIconRefreshPending: false
         readonly property string executableName: {
           var path = executablePath
           return path ? path.slice(path.lastIndexOf("/") + 1) : ""
         }
-        readonly property var desktopEntry: AppIconModel.resolve(root.desktopEntries,
-          [appClass, initialClass, executableName])
-        readonly property string iconName: desktopEntry
-          ? String(desktopEntry.icon || "") : ""
-        readonly property string iconSource: root.resolveIconSource(iconName)
+        readonly property var resolution: AppIconModel.resolveWindow(
+          root.desktopEntries, root.pluginManifests, {
+            appClass: appClass,
+            initialClass: initialClass,
+            executableName: executableName,
+            steamAppId: steamEnvironmentAppId,
+            title: title,
+            initialTitle: initialTitle
+          })
+        readonly property var pluginManifest: resolution.plugin
+        readonly property var desktopEntry: resolution.entry
+        readonly property string steamAppId: String(resolution.steamAppId || "")
+        readonly property var iconSources: {
+          var sources = []
+          var iconNames = resolution.iconNames || []
+          for (var i = 0; i < iconNames.length; i++)
+            root.appendUnique(sources, [root.availableIconSource(iconNames[i])])
+          if (steamCacheIconPath)
+            root.appendUnique(sources, [Util.fileUrl(steamCacheIconPath)])
+          if (pluginManifest) root.appendUnique(sources, root.pluginIconSources(pluginManifest))
+          root.appendUnique(sources,
+            [Quickshell.iconPath("application-x-executable", true)])
+          return sources
+        }
+        property int iconSourceIndex: 0
+        readonly property string iconSource: iconSources.length
+          ? String(iconSources[Math.min(iconSourceIndex, iconSources.length - 1)] || "") : ""
 
         Layout.preferredWidth: root.vertical ? root.barSize : root.iconSize + Style.space(6)
         Layout.preferredHeight: root.vertical ? root.iconSize + Style.space(6) : root.barSize
 
         function refreshExecutable() {
           executablePath = ""
-          if (pid <= 0 || executableLookup.running) return
+          if (pid <= 0) return
+          if (executableLookup.running) {
+            executableRefreshPending = true
+            return
+          }
+          executableRefreshPending = false
+          executableLookupPid = pid
           executableLookup.command = ["readlink", "-f", "/proc/" + pid + "/exe"]
           executableLookup.running = true
         }
 
-        onPidChanged: Qt.callLater(refreshExecutable)
-        Component.onCompleted: refreshExecutable()
+        function refreshSteamEnvironment() {
+          steamEnvironmentAppId = ""
+          if (pid <= 0) return
+          if (steamEnvironmentLookup.running) {
+            steamEnvironmentRefreshPending = true
+            return
+          }
+          steamEnvironmentRefreshPending = false
+          steamEnvironmentLookupPid = pid
+          steamEnvironmentLookup.command = ["bash", "-c",
+            "tr '\\0' '\\n' < \"$1/environ\" 2>/dev/null | sed -n 's/^SteamAppId=//p; s/^SteamGameId=//p' | head -1",
+            "steam-app-id", "/proc/" + pid]
+          steamEnvironmentLookup.running = true
+        }
+
+        function refreshSteamIcon() {
+          steamCacheIconPath = ""
+          if (!steamAppId) return
+          if (steamIconLookup.running) {
+            steamIconRefreshPending = true
+            return
+          }
+          steamIconRefreshPending = false
+          steamIconLookupAppId = steamAppId
+          steamIconLookup.command = [root.steamIconHelper, steamAppId]
+          steamIconLookup.running = true
+        }
+
+        onPidChanged: Qt.callLater(function() {
+          refreshExecutable()
+          refreshSteamEnvironment()
+        })
+        onSteamAppIdChanged: Qt.callLater(refreshSteamIcon)
+        onIconSourcesChanged: iconSourceIndex = 0
+        Component.onCompleted: {
+          refreshExecutable()
+          refreshSteamEnvironment()
+        }
 
         Process {
           id: executableLookup
+          onExited: if (windowButton.executableRefreshPending
+              || windowButton.executableLookupPid !== windowButton.pid)
+            Qt.callLater(function() { windowButton.refreshExecutable() })
           stdout: StdioCollector {
             waitForEnd: true
-            onStreamFinished: windowButton.executablePath = String(text || "").trim()
+            onStreamFinished: if (windowButton.executableLookupPid === windowButton.pid)
+              windowButton.executablePath = String(text || "").trim()
+          }
+        }
+
+
+        Process {
+          id: steamEnvironmentLookup
+          onExited: if (windowButton.steamEnvironmentRefreshPending
+              || windowButton.steamEnvironmentLookupPid !== windowButton.pid)
+            Qt.callLater(function() { windowButton.refreshSteamEnvironment() })
+          stdout: StdioCollector {
+            waitForEnd: true
+            onStreamFinished: if (windowButton.steamEnvironmentLookupPid === windowButton.pid)
+              windowButton.steamEnvironmentAppId
+                = String(text || "").trim().split(/\s+/)[0] || ""
+          }
+        }
+
+        Process {
+          id: steamIconLookup
+          onExited: if (windowButton.steamIconRefreshPending
+              || windowButton.steamIconLookupAppId !== windowButton.steamAppId)
+            Qt.callLater(function() { windowButton.refreshSteamIcon() })
+          stdout: StdioCollector {
+            waitForEnd: true
+            onStreamFinished: if (windowButton.steamIconLookupAppId
+                === windowButton.steamAppId)
+              windowButton.steamCacheIconPath
+                = String(text || "").trim().split("\n")[0] || ""
           }
         }
 
@@ -227,6 +376,10 @@ BarWidget {
             shadowVerticalOffset: 1
           }
 
+          onStatusChanged: if (status === Image.Error
+              && windowButton.iconSourceIndex + 1 < windowButton.iconSources.length)
+            windowButton.iconSourceIndex++
+
           Behavior on opacity { NumberAnimation { duration: 100 } }
           Behavior on scale { NumberAnimation { duration: 140; easing.type: Easing.OutBack } }
         }
@@ -257,7 +410,9 @@ BarWidget {
           }
           onEntered: if (root.bar) {
             var appName = windowButton.desktopEntry
-              ? String(windowButton.desktopEntry.name || "") : windowButton.appClass
+              ? String(windowButton.desktopEntry.name || "")
+              : (windowButton.pluginManifest
+                ? String(windowButton.pluginManifest.name || "") : windowButton.appClass)
             var state = windowButton.focused ? "Focused" : "Open in this workspace"
             root.bar.showTooltip(windowButton,
               windowButton.title + (appName ? "\n" + appName : "") + "\n" + state)

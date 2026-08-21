@@ -15,7 +15,13 @@ windows outside the visible scrolling viewport.
 - Uses clean, full-opacity application icons with no idle tiles or underlines.
 - Marks the focused window with a rounded, theme-aware raised surface.
 - Left-clicks focus windows, middle-clicks close them, and tooltips show titles.
-- Resolves icons for native apps, Electron apps, and Chromium web apps.
+- Resolves icons for native apps, Electron apps, Flatpaks, wrapped terminal
+  applications, Wine/Lutris games, Steam games, and Chromium-family web apps.
+- Uses each Omarchy web app's installed favicon instead of the shared browser icon.
+- Distinguishes native Quickshell plugin windows that share the same process and
+  window class, using plugin manifests, launcher aliases, and local icon assets.
+- Matches Steam games by AppID and uses Steam's installed game icon or local
+  library cache instead of the generic Steam icon.
 - Adapts to top, bottom, left, and right bars, including scaled displays.
 
 ## Install
@@ -44,14 +50,38 @@ background decoration; only the focused window receives a selection surface.
 - Hyprland.
 - Standard Freedesktop desktop entries for application icon matching.
 
-There are no extra packages, daemons, polling scripts, or network calls. Window
-state comes from Quickshell's Hyprland integration. Executable lookup reads only
-`/proc/<pid>/exe` to improve desktop-entry matching.
+There are no extra packages, daemons, polling loops, or runtime network calls.
+Window state comes from Quickshell's Hyprland integration. One-shot process
+lookups read `/proc/<pid>/exe` and the Steam AppID environment variables to
+identify wrapped applications. Web-app icons come from the local desktop
+entries and icon files that Omarchy creates when installing a web app.
+Quickshell plugin windows use the shell's live plugin registry; launcher icons
+remain authoritative when a matching desktop entry exists, with plugin-local
+icon assets as the fallback.
 
 The widget has no application-specific class list or monitor coordinates. It
 uses each system's Freedesktop desktop entries, focused Hyprland workspace, and
 live compositor geometry, so it works with custom themes, multiple monitors,
-standard Hyprland layouts, and scrolling layouts.
+standard Hyprland layouts, and scrolling layouts. Web-app matching uses generic
+URL hosts and installed PWA IDs rather than an application-specific allowlist.
+
+## Icon resolution
+
+The widget follows one deterministic pipeline:
+
+1. Match stable platform identity: Steam AppID, web-app URL/app ID, or
+   Quickshell plugin manifest.
+2. Match the window class, initial class, and executable against Freedesktop
+   desktop-entry IDs, `StartupWMClass`, and every command token.
+3. Match the exact window title to the desktop-entry name only when stronger
+   identifiers did not resolve it.
+4. Render through Omarchy's shared launcher icon index and icon-theme lookup.
+5. Fall back to a plugin-local asset, Steam's local library icon, then the
+   system's generic application icon.
+
+This covers applications installed by Omarchy as well as standard native,
+Flatpak, AppImage, Wine/Proton, Steam, Electron, browser-app, terminal-wrapper,
+and Quickshell packaging conventions without per-application rules.
 
 ## Remove
 
